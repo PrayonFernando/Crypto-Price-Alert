@@ -1,0 +1,23 @@
+# node
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+build/
+.expo/
+.expo-shared/
+coverage/
+
+# env
+.env
+.env.*
+!.env.example
+
+# editor/os
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json

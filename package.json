@@ -1,0 +1,28 @@
+{
+  "name": "Crypto-Price-Alert",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev:mobile": "pnpm --filter @app/mobile start",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "build": "turbo run build",
+    "dev:api": "pnpm --filter @app/backend dev",
+    "build:api": "pnpm --filter @app/backend build",
+    "start:api": "pnpm --filter @app/backend start"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "eslint": "^9.34.0",
+    "expo": "^53",
+    "prettier": "^3.6.2",
+    "tsx": "^4.7",
+    "turbo": "^2.5.6",
+    "typescript": "^5.9.2"
+  }
+}
