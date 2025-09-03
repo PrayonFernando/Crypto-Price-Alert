@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum SubscriptionProvider {
+  STRIPE
+  APPLE
+  GOOGLE
+  REVENUECAT
+}
+
+enum SubscriptionStatus {
+  trial
+  active
+  past_due
+  canceled
+  expired
+  in_grace
+}
+
+model User {
+  id                 String             @id @default(cuid())
+  email              String             @unique
+  passwordHash       String
+  trialStart         DateTime
+  trialEnd           DateTime
+  subscriptionStatus SubscriptionStatus
+  subscriptions      Subscription[]
+  alerts             Alert[]
+  devices            Device[]
+
+  paymentEvents PaymentEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PaymentEvent {
+  id              String               @id @default(cuid())
+  userId          String
+  provider        SubscriptionProvider
+  providerEventId String               @unique
+  type            String
+  amountCents     Int?
+  currency        String?
+  raw             Json
+  createdAt       DateTime             @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Alert {
+  id        String   @id @default(cuid())
+  userId    String
+  coinId    String
+  above     Float?
+  below     Float?
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, coinId])
+}
+
+model Device {
+  id            String   @id @default(cuid())
+  userId        String
+  expoPushToken String   @unique
+  platform      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id])
+}
+
+model Subscription {
+  id                     String               @id @default(cuid())
+  userId                 String
+  provider               SubscriptionProvider
+  providerCustomerId     String?
+  providerSubscriptionId String?              @unique
+  status                 SubscriptionStatus
+  currentPeriodEnd       DateTime?
+  trialEnd               DateTime?
+  planId                 String?
+  priceCents             Int?
+  currency               String?
+  cancelAtPeriodEnd      Boolean              @default(false)
+  rawProviderState       Json?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  user                   User                 @relation(fields: [userId], references: [id])
+
+  @@index([userId, provider, status])
+}

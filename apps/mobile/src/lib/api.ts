@@ -1,40 +1,48 @@
-import { ZodSchema } from "zod";
+import { z } from "zod";
+import { getToken } from "./session";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL!;
 console.log("EXPO_PUBLIC_API_URL =", BASE_URL);
-if (!BASE_URL) {
-  // This throws early in dev so we don't silently fetch undefined
-  // eslint-disable-next-line no-throw-literal
-  throw new Error("Missing EXPO_PUBLIC_API_URL");
-}
+if (!BASE_URL) throw new Error("Missing EXPO_PUBLIC_API_URL");
 
-async function get<T>(
+export async function request<T>(
   path: string,
-  schema: ZodSchema<T>,
-  init?: RequestInit,
+  schema: z.ZodType<T>,
+  init?: RequestInit & { timeoutMs?: number },
 ): Promise<T> {
-  const url = `${BASE_URL}${path}`;
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), 15000);
-  try {
-    const res = await fetch(url, {
-      ...init,
-      method: "GET",
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`GET ${path} ${res.status}: ${body}`);
-    }
-    const json = await res.json();
-    const parsed = schema.safeParse(json);
-    if (!parsed.success) {
-      throw new Error(`Schema mismatch for ${path}: ${parsed.error.message}`);
-    }
-    return parsed.data;
-  } finally {
-    clearTimeout(id);
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), init?.timeoutMs ?? 15000);
+
+  const token = await getToken();
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    signal: ctrl.signal,
+  });
+  clearTimeout(t);
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
   }
+  const json = await res.json();
+  const parsed = schema.safeParse(json);
+  if (!parsed.success) {
+    throw new Error(`Invalid response for ${path}: ${parsed.error.message}`);
+  }
+  return parsed.data;
 }
 
-export const api = { get };
+export const api = {
+  get: <T>(path: string, schema: z.ZodType<T>) =>
+    request(path, schema, { method: "GET" }),
+  post: <T>(path: string, body: unknown, schema: z.ZodType<T>) =>
+    request(path, schema, { method: "POST", body: JSON.stringify(body) }),
+  put: <T>(path: string, body: unknown, schema: z.ZodType<T>) =>
+    request(path, schema, { method: "PUT", body: JSON.stringify(body) }),
+  del: (path: string) => request(path, z.any(), { method: "DELETE" }),
+};

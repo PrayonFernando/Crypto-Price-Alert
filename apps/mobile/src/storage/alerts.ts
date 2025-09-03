@@ -1,34 +1,48 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export type AlertMode = "notify" | "alarm";
 export type AlertRule = {
-  id: string; // uuid
-  coinId: string;
   above?: number;
   below?: number;
-  mode: AlertMode;
-  createdAt: number;
+  enabled: boolean;
+  updatedAt: number;
+  coinName?: string;
 };
 
-const KEY = "alerts:v1";
+const KEY = "alerts:v1"; // single bucket
 
-export async function getAlerts(): Promise<AlertRule[]> {
+type Store = Record<string, AlertRule>; // coinId -> rule
+
+export async function loadAllAlerts(): Promise<Store> {
   const raw = await AsyncStorage.getItem(KEY);
-  if (!raw) return [];
+  if (!raw) return {};
   try {
-    return JSON.parse(raw) as AlertRule[];
+    return JSON.parse(raw) as Store;
   } catch {
-    return [];
+    return {};
   }
 }
 
-export async function addAlert(a: AlertRule): Promise<void> {
-  const list = await getAlerts();
-  list.push(a);
-  await AsyncStorage.setItem(KEY, JSON.stringify(list));
+export async function saveAlert(coinId: string, rule: AlertRule) {
+  const store = await loadAllAlerts();
+  store[coinId] = rule;
+  await AsyncStorage.setItem(KEY, JSON.stringify(store));
 }
 
-export async function getAlertsByCoin(coinId: string): Promise<AlertRule[]> {
-  const list = await getAlerts();
-  return list.filter((a) => a.coinId === coinId);
+export async function getAlert(coinId: string): Promise<AlertRule | undefined> {
+  const store = await loadAllAlerts();
+  return store[coinId];
+}
+
+export async function setEnabled(coinId: string, enabled: boolean) {
+  const store = await loadAllAlerts();
+  const cur = store[coinId];
+  if (!cur) return;
+  store[coinId] = { ...cur, enabled, updatedAt: Date.now() };
+  await AsyncStorage.setItem(KEY, JSON.stringify(store));
+}
+
+export async function deleteAlert(coinId: string) {
+  const store = await loadAllAlerts();
+  delete store[coinId];
+  await AsyncStorage.setItem(KEY, JSON.stringify(store));
 }

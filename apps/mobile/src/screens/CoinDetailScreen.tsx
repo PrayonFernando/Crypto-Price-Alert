@@ -79,7 +79,7 @@ export default function CoinDetailScreen() {
 
           <TouchableOpacity
             style={s.cta}
-            onPress={() => nav.navigate("Alerts", { coinId })}
+            onPress={() => nav.navigate("Alerts", { coinId, coinName: name })}
           >
             <Text style={s.ctaText}>Set Alert (Above / Below)</Text>
           </TouchableOpacity>

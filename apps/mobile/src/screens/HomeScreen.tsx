@@ -1,105 +1,61 @@
 import React from "react";
-import {
-  View,
-  FlatList,
-  Text,
-  TouchableOpacity,
-  Image,
-  RefreshControl,
-} from "react-native";
-import { useMarkets } from "../hooks/useMarkets";
-import { fmtUsd, fmtPct, pctColor } from "../utils/format";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import ErrorBanner from "../components/ErrorBanner";
+import { View, Text, StyleSheet } from "react-native";
+import { useAuth } from "../hooks/useAuth";
+import colors from "../theme/colors";
 
-type RootStackParamList = {
-  Home: undefined;
-  CoinDetail: { id: string; name: string };
-  Alerts: undefined;
-};
-type Props = NativeStackScreenProps<RootStackParamList, "Home">;
-
-export default function HomeScreen({ navigation }: Props) {
-  const { data, isLoading, refetch, isRefetching, error } = useMarkets();
-  const errMsg =
-    error instanceof Error ? error.message : error ? String(error) : "";
+export default function HomeScreen() {
+  const { user } = useAuth();
+  const trialDaysLeft = user
+    ? Math.max(
+        0,
+        Math.ceil(
+          (new Date(user.trialEnd).getTime() - Date.now()) /
+            (1000 * 60 * 60 * 24),
+        ),
+      )
+    : null;
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#0B0B0B" }}>
-      <ErrorBanner message={errMsg} />
-      <FlatList
-        data={data}
-        keyExtractor={(item) => item.id}
-        refreshControl={
-          <RefreshControl
-            refreshing={isLoading || isRefetching}
-            onRefresh={refetch}
-          />
-        }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              padding: 12,
-              borderBottomColor: "#1b1b1b",
-              borderBottomWidth: 1,
-            }}
-            onPress={() =>
-              navigation.navigate("CoinDetail", {
-                id: item.id,
-                name: item.name,
-              })
-            }
-          >
-            {item.image ? (
-              <Image
-                source={{ uri: item.image }}
-                style={{
-                  width: 28,
-                  height: 28,
-                  marginRight: 10,
-                  borderRadius: 14,
-                }}
-              />
-            ) : (
-              <View
-                style={{
-                  width: 28,
-                  height: 28,
-                  marginRight: 10,
-                  backgroundColor: "#222",
-                  borderRadius: 14,
-                }}
-              />
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: "#fff", fontWeight: "600" }}>
-                {item.name}{" "}
-                <Text style={{ color: "#999", fontSize: 12 }}>
-                  {item.symbol.toUpperCase()}
-                </Text>
-              </Text>
-              <Text style={{ color: "#ccc", marginTop: 2 }}>
-                {fmtUsd(item.current_price)}
-              </Text>
-            </View>
-            <Text
-              style={{
-                color: pctColor(item.price_change_percentage_24h),
-                fontWeight: "700",
-              }}
-            >
-              {fmtPct(item.price_change_percentage_24h)}
-            </Text>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          <View style={{ padding: 24 }}>
-            <Text style={{ color: "#aaa" }}>No data yet.</Text>
-          </View>
-        }
-      />
+    <View style={s.container}>
+      <Text style={s.title}>Crypto Price Alert</Text>
+      <Text style={s.body}>
+        Set ABOVE/BELOW thresholds for any coin and get notified instantly.
+      </Text>
+      {user ? (
+        <View style={s.card}>
+          <Text style={s.cardTitle}>Your subscription</Text>
+          <Text style={s.cardBody}>
+            Status:{" "}
+            <Text style={{ fontWeight: "700" }}>{user.subscriptionStatus}</Text>
+          </Text>
+          <Text style={s.cardBody}>
+            Trial ends: {new Date(user.trialEnd).toDateString()} (
+            {trialDaysLeft} days left)
+          </Text>
+        </View>
+      ) : (
+        <View style={s.card}>
+          <Text style={s.cardTitle}>Free 3-day Trial</Text>
+          <Text style={s.cardBody}>
+            Create an account to start your trial. No payment now.
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
+
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg, padding: 16, gap: 16 },
+  title: { color: colors.text, fontSize: 22, fontWeight: "800" },
+  body: { color: "#bbb" },
+  card: {
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+  },
+  cardTitle: { color: colors.text, fontWeight: "800", marginBottom: 6 },
+  cardBody: { color: "#ddd" },
+});

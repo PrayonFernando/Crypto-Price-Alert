@@ -1,23 +1,23 @@
+import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import marketsRoutes from "./routes/markets.js";
+import marketsRoutes from "./routes/markets";
+import { authRoutes } from "./routes/auth";
+import { authPlugin } from "./plugins/auth";
+import { alertsRoutes } from "./routes/alerts";
+import { devicesRoutes } from "./routes/devices";
 
-const PORT = Number(process.env.PORT ?? 8080);
+const app = Fastify({ logger: true });
+await app.register(cors, { origin: true });
 
-async function main() {
-  const app = Fastify({ logger: true });
+// public
+await app.register(marketsRoutes);
+await app.register(authRoutes);
 
-  await app.register(cors, { origin: true });
+// protected
+await app.register(authPlugin);
+await app.register(alertsRoutes);
+await app.register(devicesRoutes);
 
-  app.get("/health", async () => ({ ok: true, ts: Date.now() }));
-
-  await app.register(marketsRoutes);
-
-  await app.listen({ port: PORT, host: "0.0.0.0" });
-  app.log.info(`api listening on http://localhost:${PORT}`);
-}
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+app.get("/health", async () => ({ ok: true, ts: Date.now() }));
+await app.listen({ host: "0.0.0.0", port: 8080 });
