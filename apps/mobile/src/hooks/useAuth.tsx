@@ -35,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function refreshMe() {
     setLoading(true);
     try {
+      // adjust path if your backend does NOT prefix with /api
       const me = await api.get("/api/auth/me", UserSchema);
       setUser(me);
     } catch {
@@ -53,9 +54,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function login(email: string, password: string) {
+    const normEmail = email.trim().toLowerCase();
     const { token, user } = await api.post(
+      // adjust path if needed: "/auth/login" if your server doesn't use /api
       "/api/auth/login",
-      { email, password },
+      { email: normEmail, password },
       AuthResponse,
     );
     await saveToken(token);
@@ -63,9 +66,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signup(email: string, password: string) {
+    const normEmail = email.trim().toLowerCase();
     const { token, user } = await api.post(
+      // adjust path if needed: "/auth/signup" if your server doesn't use /api
       "/api/auth/signup",
-      { email, password },
+      { email: normEmail, password },
       AuthResponse,
     );
     await saveToken(token);

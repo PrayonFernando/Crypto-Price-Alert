@@ -26,12 +26,14 @@ export default function CoinDetailScreen() {
   const [price, setPrice] = useState<number | undefined>();
   const [pct, setPct] = useState<number | undefined>();
   const [name, setName] = useState<string>("");
+  const [symbol, setSymbol] = useState<string>("");
   const [icon, setIcon] = useState<string | undefined>();
   const [chart, setChart] = useState<ChartPoint[]>([]);
 
   useEffect(() => {
     let alive = true;
-    (async () => {
+
+    async function fetchAll() {
       setLoading(true);
       try {
         const [c, ch] = await Promise.all([
@@ -40,6 +42,7 @@ export default function CoinDetailScreen() {
         ]);
         if (!alive) return;
         setName(c.name);
+        setSymbol(c.symbol?.toUpperCase?.() ?? "");
         setIcon(c.image?.small);
         setPrice(c.market_data?.current_price?.usd);
         setPct(c.market_data?.price_change_percentage_24h);
@@ -47,11 +50,66 @@ export default function CoinDetailScreen() {
       } finally {
         if (alive) setLoading(false);
       }
-    })();
+    }
+
+    fetchAll();
+
+    // light polling fallbacks
+    const priceTimer = setInterval(async () => {
+      try {
+        const c = await getCoin(coinId);
+        if (!alive) return;
+        setPrice(c.market_data?.current_price?.usd);
+        setPct(c.market_data?.price_change_percentage_24h);
+      } catch {}
+    }, 20000); // 20s as a backup
+
+    const chartTimer = setInterval(async () => {
+      try {
+        const ch = await getMarketChart(coinId, 1, "usd");
+        if (!alive) return;
+        setChart(ch);
+      } catch {}
+    }, 60000); // 60s refresh
+
     return () => {
       alive = false;
+      clearInterval(priceTimer);
+      clearInterval(chartTimer);
     };
   }, [coinId]);
+
+  // Live price (Binance miniTicker) — client-side WS
+  useEffect(() => {
+    if (!symbol) return;
+    const pair = `${symbol}USDT`.toLowerCase(); // e.g., BTC → btcusdt
+    const url = `wss://stream.binance.com:9443/ws/${pair}@miniTicker`;
+    let ws: WebSocket | null = null;
+    let closed = false;
+
+    try {
+      ws = new WebSocket(url);
+      ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(String(e.data));
+          // 'c' = last price (string)
+          if (msg?.c) setPrice(parseFloat(msg.c));
+        } catch {}
+      };
+      ws.onerror = () => {
+        // ignore; fallback polling keeps price moving
+      };
+    } catch {
+      // ignore
+    }
+
+    return () => {
+      closed = true;
+      try {
+        ws?.close();
+      } catch {}
+    };
+  }, [symbol]);
 
   return (
     <View style={s.container}>
@@ -63,6 +121,7 @@ export default function CoinDetailScreen() {
             {icon ? <Image source={{ uri: icon }} style={s.icon} /> : null}
             <Text style={s.title}>{name}</Text>
           </View>
+
           <View style={s.card}>
             <Text style={s.price}>{fmtMoney(price)}</Text>
             <Text

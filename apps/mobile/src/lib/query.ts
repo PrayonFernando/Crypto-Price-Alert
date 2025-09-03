@@ -24,11 +24,12 @@ focusManager.setEventListener((handleFocus) => {
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
-      retry: 1,
+      staleTime: 15_000, // 15s fresh
+      gcTime: 5 * 60_000, // 5 min cache
+      retry: 1, // be gentle on flaky networks
       refetchOnReconnect: true,
-      // Note: in React Query v5, `refetchOnWindowFocus` is web-only;
-      // in RN we use focusManager above instead.
+      refetchOnMount: false,
+      refetchOnWindowFocus: false, // RN has no window; we’ll manage focus manually
     },
   },
 });

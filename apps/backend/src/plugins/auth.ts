@@ -1,33 +1,41 @@
 import fp from "fastify-plugin";
-import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import jwt from "jsonwebtoken";
 
-const SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
+declare module "fastify" {
+  interface FastifyInstance {
+    auth: (req: any, reply: any) => Promise<void>;
+  }
+  interface FastifyRequest {
+    user?: { sub: string };
+  }
+}
 
-/**
- * Adds app.auth preHandler. In dev, if DEV_BYPASS_AUTH=1 it injects a fake user.
- */
 export const authPlugin: FastifyPluginAsync = fp(async (app) => {
-  app.decorate("auth", async (req: FastifyRequest, reply: FastifyReply) => {
-    if (process.env.DEV_BYPASS_AUTH === "1") {
-      req.user = { sub: "dev-user-1", email: "dev@local" };
+  const DEV_BYPASS = process.env.DEV_BYPASS_AUTH === "1";
+  const secret = process.env.JWT_SECRET;
+  if (!secret && !DEV_BYPASS) {
+    app.log.warn("JWT_SECRET missing and DEV_BYPASS_AUTH is not enabled");
+  }
+
+  app.decorate("auth", async (req, reply) => {
+    if (DEV_BYPASS) {
+      // Always set a user during dev bypass
+      req.user = { sub: "dev-user" };
       return;
     }
 
-    const h = req.headers.authorization;
-    if (!h?.startsWith("Bearer ")) {
-      reply.code(401).send({ error: "unauthorized" });
-      return;
+    const auth = req.headers.authorization;
+    if (!auth?.startsWith("Bearer ")) {
+      return reply.code(401).send({ error: "no_token" });
     }
-    const token = h.slice(7);
+    const token = auth.slice(7);
     try {
-      const payload = jwt.verify(token, SECRET) as any;
-      req.user = {
-        sub: String(payload.sub),
-        email: payload.email ? String(payload.email) : undefined,
-      };
+      const payload = jwt.verify(token, secret!) as { sub?: string };
+      if (!payload?.sub) throw new Error("no sub");
+      req.user = { sub: payload.sub };
     } catch {
-      reply.code(401).send({ error: "invalid_token" });
+      return reply.code(401).send({ error: "bad_token" });
     }
   });
 });

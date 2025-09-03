@@ -14,6 +14,27 @@ export type Market = {
 
 export type ChartPoint = { x: Date; y: number };
 
+function mapPricesToPoints(prices: [number, number][]): ChartPoint[] {
+  return prices
+    .filter(([ts, p]) => Number.isFinite(ts) && Number.isFinite(p))
+    .map(([ts, p]) => ({ x: new Date(ts), y: p }));
+}
+
+async function directChart(
+  coinId: string,
+  days: number,
+  vs: string,
+): Promise<ChartPoint[]> {
+  const interval = days <= 1 ? "minute" : "hourly";
+  const url =
+    `${API}/coins/${encodeURIComponent(coinId)}/market_chart` +
+    `?vs_currency=${vs}&days=${days}&interval=${interval}`;
+  const res = await fetch(url, { headers: { accept: "application/json" } });
+  if (!res.ok) throw new Error(`Chart HTTP ${res.status}`);
+  const data = await res.json();
+  return mapPricesToPoints(data?.prices ?? []);
+}
+
 export async function getTopMarkets(
   page = 1,
   perPage = 50,
@@ -26,6 +47,7 @@ export async function getTopMarkets(
     if (!res.ok) throw new Error(`Backend markets HTTP ${res.status}`);
     return res.json();
   }
+
   const url =
     `${API}/coins/markets?vs_currency=${vs}` +
     `&order=market_cap_desc&per_page=${perPage}&page=${page}` +
@@ -40,21 +62,30 @@ export async function getMarketChart(
   days = 1,
   vs = "usd",
 ): Promise<ChartPoint[]> {
+  // 1) Try backend (if configured)
   if (USE_BACKEND) {
-    const res = await fetch(
-      `${BACKEND}/api/coins/${encodeURIComponent(coinId)}/chart?vs=${vs}&days=${days}`,
-    );
-    if (!res.ok) throw new Error(`Backend chart HTTP ${res.status}`);
-    const data = await res.json();
-    const prices: [number, number][] = data?.prices ?? [];
-    return prices.map(([ts, price]) => ({ x: new Date(ts), y: price }));
+    try {
+      const res = await fetch(
+        `${BACKEND}/api/coins/${encodeURIComponent(coinId)}/chart?vs=${vs}&days=${days}`,
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const pts = mapPricesToPoints(
+          (data?.prices ?? []) as [number, number][],
+        );
+        if (pts.length) return pts;
+      }
+    } catch {}
   }
-  const url = `${API}/coins/${encodeURIComponent(coinId)}/market_chart?vs_currency=${vs}&days=${days}&interval=hourly`;
-  const res = await fetch(url, { headers: { accept: "application/json" } });
-  if (!res.ok) throw new Error(`Chart HTTP ${res.status}`);
-  const data = await res.json();
-  const prices: [number, number][] = data?.prices ?? [];
-  return prices.map(([ts, price]) => ({ x: new Date(ts), y: price }));
+
+  // 2) Fallback to direct CoinGecko
+  try {
+    const pts = await directChart(coinId, days, vs);
+    if (pts.length) return pts;
+  } catch {}
+
+  // 3) Final fallback: expand range (7d) to populate something
+  return directChart(coinId, Math.max(days, 7), vs);
 }
 
 export async function getCoin(coinId: string): Promise<{
@@ -74,7 +105,11 @@ export async function getCoin(coinId: string): Promise<{
     if (!res.ok) throw new Error(`Backend coin HTTP ${res.status}`);
     return res.json();
   }
-  const url = `${API}/coins/${encodeURIComponent(coinId)}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`;
+
+  const url =
+    `${API}/coins/${encodeURIComponent(coinId)}` +
+    `?localization=false&tickers=false&market_data=true` +
+    `&community_data=false&developer_data=false&sparkline=false`;
   const res = await fetch(url, { headers: { accept: "application/json" } });
   if (!res.ok) throw new Error(`Coin HTTP ${res.status}`);
   return res.json();

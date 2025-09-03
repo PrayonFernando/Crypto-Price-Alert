@@ -52,7 +52,6 @@ export default function MarketsScreen(_props: Props) {
             onPress={() =>
               navigation.navigate("CoinDetail", {
                 coinId: item.id, // ✅ use the unified param names
-                coinName: item.name,
               })
             }
           >

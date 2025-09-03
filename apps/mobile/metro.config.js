@@ -4,6 +4,7 @@ const { getDefaultConfig } = require("expo/metro-config");
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, "../..");
 
+/** @type {import('metro-config').MetroConfig} */
 const config = getDefaultConfig(projectRoot);
 config.watchFolders = [workspaceRoot];
 config.resolver.nodeModulesPaths = [
@@ -12,6 +13,13 @@ config.resolver.nodeModulesPaths = [
 ];
 config.resolver.unstable_enableSymlinks = true;
 config.resolver.disableHierarchicalLookup = true;
+config.resolver = {
+  ...(config.resolver ?? {}),
+  extraNodeModules: {
+    ...(config.resolver?.extraNodeModules ?? {}),
+    buffer: require.resolve("buffer/"),
+  },
+};
 
 module.exports = config;
 module.exports = getDefaultConfig(__dirname);

@@ -119,20 +119,19 @@ export default async function routes(app: FastifyInstance) {
       })
       .parse(req.query);
 
-    const key = `chart:${p.id}:${q.vs}:${q.days}`;
-    const cached = chartCache.get(key);
-    if (cached) return cached;
+    const interval = q.days <= 1 ? "minute" : "hourly"; // 👈 change
+    const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(
+      p.id,
+    )}/market_chart?vs_currency=${q.vs}&days=${q.days}&interval=${interval}`;
 
-    const url =
-      `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(p.id)}` +
-      `/market_chart?vs_currency=${q.vs}&days=${q.days}&interval=hourly`;
+    const res = await fetch(url, { headers: { accept: "application/json" } });
+    if (!res.ok)
+      return reply
+        .code(502)
+        .send({ error: "coingecko_error", status: res.status });
 
-    const data = await fetchCoingeckoWithRetry(url, reply, {
-      retries: 2,
-      stale: cached,
-    });
-    if (reply.sent) return;
-    chartCache.set(key, data);
+    const data = await res.json(); // { prices: [[t, p], ...], ... }
+    chartCache.set(`chart:${p.id}:${q.vs}:${q.days}`, data);
     return data;
   });
 }

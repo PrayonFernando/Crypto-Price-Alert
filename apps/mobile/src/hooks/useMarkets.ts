@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { api } from "../lib/api";
+import { getTopMarkets } from "../services/coingecko";
 
 const MarketSchema = z.object({
   id: z.string(),
@@ -14,10 +15,11 @@ const MarketsSchema = z.array(MarketSchema);
 
 export type Market = z.infer<typeof MarketSchema>;
 
-export function useMarkets() {
+export function useMarkets(vs = "usd", page = 1, perPage = 50) {
   return useQuery({
-    queryKey: ["markets"],
-    queryFn: () => api.get("/api/markets", MarketsSchema), // ✅ ensure /api prefix here
-    staleTime: 30_000,
+    queryKey: ["markets", vs, page, perPage],
+    queryFn: () => getTopMarkets(page, perPage, vs),
+    refetchInterval: 2000, // refresh list every 2s
+    staleTime: 1000, // cache a bit to avoid flicker
   });
 }
